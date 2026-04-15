@@ -1,0 +1,22 @@
+{
+  "doc_type_rules": [
+    {
+      "name": "合同",
+      "keywords": ["合同", "协议", "签署"]
+    },
+    {
+      "name": "发票",
+      "keywords": ["发票", "税额", "开票"]
+    }
+  ],
+  "archive_rules": [
+    {
+      "doc_type": "合同",
+      "target_folder": "合同/待复核"
+    },
+    {
+      "doc_type": "发票",
+      "target_folder": "财务/发票"
+    }
+  ]
+}

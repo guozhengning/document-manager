@@ -1,0 +1,2 @@
+# Keep this file aligned with pyproject.toml for course/demo delivery.
+# No third-party runtime dependencies have been added yet.

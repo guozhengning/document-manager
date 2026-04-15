@@ -1,0 +1,36 @@
+# Example project settings.
+
+project:
+  name: document-manager
+  environment: local
+
+paths:
+  watch_directory: ./data/inbox
+  result_directory: ./data/results
+  archive_directory: ./data/archive
+  temp_directory: ./data/temp
+  log_directory: ./data/logs
+
+watcher:
+  enabled: false
+  poll_interval_seconds: 3
+  stable_check_seconds: 2
+
+parser:
+  supported_extensions:
+    - .pdf
+    - .docx
+    - .txt
+
+ai:
+  provider: glm
+  model: glm-4.5
+  prompt_file: ./prompts/document_analysis.txt
+
+storage:
+  output_format: json
+  overwrite_existing: false
+
+logging:
+  level: INFO
+  file_name: app.log
