@@ -36,19 +36,13 @@ python main.py
 ```text
 document manager/
   src/
-    README.md
     watcher/
-      README.md
     parser/
-      README.md
     ai/
-      README.md
     storage/
-      README.md
     workflow/
-      README.md
     utils/
-      README.md
+
   config/
     settings.example.yaml
     rules.example.json
