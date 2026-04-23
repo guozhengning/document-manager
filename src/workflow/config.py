@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Any
+import json
 
 from src.utils.exceptions import ConfigError
-from src.utils.models import AppSettings
+from src.utils.models import AppSettings, ArchiveRule, DocTypeRule
 
 
 # `__file__` 是当前文件 `src/workflow/config.py` 的路径。
@@ -581,8 +582,69 @@ def _coalesce_env(env_values: dict[str, str], key: str, fallback: Any) -> Any:
     return os.environ.get(key, env_values.get(key, fallback))
 
 
-if __name__ == "__main__":
-    config_path = PROJECT_ROOT / "config" / "settings.example.yaml"
-    text = config_path.read_text(encoding="utf-8")
-    parsed = _parse_simple_yaml(text)
-    print(parsed)
+def load_rules(rules_path: Path) -> tuple[list[DocTypeRule], list[ArchiveRule]]:
+    """
+    加载文档类型规则和归档规则。
+
+    doc_type_rules 和 archive_rules 解析后保持定义顺序。规则缺少关键字段时直接失败，不做静默容错。
+
+    Args:
+        rules_path: 规则文件路径
+
+    Returns:
+        tuple: 包含文档类型规则列表和归档规则列表的元组  
+    """
+    if not rules_path.is_file():
+        raise ConfigError(f"规则文件不存在: {rules_path}")
+    
+    try:
+        rules_data = json.loads(rules_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ConfigError(f"规则文件 JSON 解析错误: {exc}") from exc
+    except OSError as exc:
+        raise ConfigError(f"规则文件读取失败: {exc}") from exc
+    if not isinstance(rules_data, dict):
+        raise ConfigError("规则文件根节点必须是对象")
+
+    if not isinstance(rules_data.get("doc_type_rules"), list):
+        raise ConfigError("doc_type_rules 必须是列表")
+
+    if not isinstance(rules_data.get("archive_rules"), list):
+        raise ConfigError("archive_rules 必须是列表")
+
+    try:
+        doc_type_rules = []
+        for item in rules_data["doc_type_rules"]:
+            if not isinstance(item, dict):
+                raise ConfigError("doc_type_rules 中的每项必须是对象")
+            if not isinstance(item.get("name"), str) or not item["name"].strip():
+                raise ConfigError("doc_type_rules 中的每项必须包含非空字符串字段 name")
+            if not isinstance(item.get("keywords"), list) or not all(isinstance(k, str) and k.strip() for k in item["keywords"]):
+                raise ConfigError("doc_type_rules 中的每项必须包含字符串列表字段 keywords")
+            doc_type_rules.append(DocTypeRule(name=item["name"].strip(), keywords=[k.strip() for k in item["keywords"]]))
+
+        archive_rules = []
+        for item in rules_data["archive_rules"]:
+            if not isinstance(item, dict):
+                raise ConfigError("archive_rules 中的每项必须是对象")
+            if not isinstance(item.get("doc_type"), str) or not item["doc_type"].strip():
+                raise ConfigError("archive_rules 中的每项必须包含非空字符串字段 doc_type")
+            if not isinstance(item.get("target_folder"), str) or not item["target_folder"].strip():
+                raise ConfigError("archive_rules 中的每项必须包含非空字符串字段 target_folder")
+            archive_rules.append(ArchiveRule(doc_type=item["doc_type"].strip(), target_folder=item["target_folder"].strip()))
+    except KeyError as exc:
+        raise ConfigError(f"规则项缺少必要字段: {exc}") from exc
+    return doc_type_rules, archive_rules         
+
+
+    
+
+
+
+
+
+
+
+
+
+

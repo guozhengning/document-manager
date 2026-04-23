@@ -320,8 +320,10 @@ class StorageError(Exception): ...
 - 异常：目录不可用或 Prompt 缺失时抛 `ConfigError`
 - 调用时机：`run_once()` 前
 - 处理规则：
-  - 需要的目录不存在时自动创建。
-  - `prompt_file` 不存在时直接报错。
+  - `watch_directory`不存在或不是目录时报错
+  - `result_directory`、`archive_directory`、`temp_directory`、`log_directory` 不存在时自动创建。
+。
+  - `prompt_file` 不存在或不是文件时直接报错。
 
 ### 7.2 扫描与任务生成
 
