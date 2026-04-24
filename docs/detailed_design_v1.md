@@ -394,7 +394,7 @@ class StorageError(Exception): ...
 
 #### `clean_extracted_text(text: str) -> str`
 
-- 模块路径：`src/parser/core.py`
+- 模块路径：`src/parser/common.py`
 - 作用：清洗文本，去掉多余空白和连续空行。
 - 输入：原始文本
 - 输出：清洗后的文本
@@ -406,7 +406,7 @@ class StorageError(Exception): ...
 
 #### `build_parse_result(file_path: Path, raw_text: str, metadata: dict[str, Any] | None = None) -> ParseResult`
 
-- 模块路径：`src/parser/core.py`
+- 模块路径：`src/parser/common.py`
 - 作用：统一封装解析结果。
 - 输入：原文件路径、文本、元信息。
 - 输出：`ParseResult`
