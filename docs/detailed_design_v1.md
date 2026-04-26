@@ -466,7 +466,7 @@ class StorageError(Exception): ...
   - 包含“发票”“税额”时输出 `doc_type="发票"`
   - 否则输出 `doc_type="待确认"`
   - `summary` 截取前 `80~120` 个字符
-  - `keywords` 由高频词组成简化版本
+  - `keywords` 由命中词和高频词组成简化版本
 
 ### 7.5 规则与结果修正
 

@@ -71,7 +71,9 @@ def mock_analyze_document(parse_result: ParseResult, ai_input: str) -> AIResult:
 
     word_freq = Counter(word_list)
     keywords = [word for word, freq in word_freq.most_common(10)]
-       
+    
+    pointer = ["合同", "协议", "发票", "税额", "开票", "签署"]
+    keywords = keywords + [word for word in pointer if word in text_cleaned]
 
     return AIResult(
         file_name=parse_result.file_name,
