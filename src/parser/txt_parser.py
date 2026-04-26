@@ -39,12 +39,11 @@ def parse_txt(file_path: Path) -> ParseResult:
     cleaned_text = clean_extracted_text(raw_text)
     parser = "txt"
     return build_parse_result(
-        file_path,
-        raw_text,
-        {
-            "cleaned": cleaned_text,
+        file_path=file_path,
+        raw_text=raw_text,
+        clean_text=cleaned_text,
+        metadata={
             "encoding": encoding,
-            "line_count": cleaned_text.count("\n") + 1,
             "parser": parser,
         },
     )

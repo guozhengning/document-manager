@@ -453,11 +453,11 @@ class StorageError(Exception): ...
   - 默认走本地 `mock_analyze_document()`。
   - 为后续真实模型调用保留同名接口。
 
-#### `mock_analyze_document(parse_result: ParseResult) -> AIResult`
+#### `mock_analyze_document(parse_result: ParseResult, ai_input) -> AIResult`
 
 - 模块路径：`src/ai/analyzer.py`
 - 作用：第一版的占位实现，用关键词和截断文本生成结果。
-- 输入：`parse_result`
+- 输入：`parse_result`, `ai_input`:第一版只接受不使用
 - 输出：`AIResult`
 - 异常：无
 - 调用时机：`analyze_document()` 内部
@@ -466,7 +466,7 @@ class StorageError(Exception): ...
   - 包含“发票”“税额”时输出 `doc_type="发票"`
   - 否则输出 `doc_type="待确认"`
   - `summary` 截取前 `80~120` 个字符
-  - `keywords` 由命中词和高频词组成简化版本
+  - `keywords` 由高频词组成简化版本
 
 ### 7.5 规则与结果修正
 

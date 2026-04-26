@@ -32,21 +32,26 @@ def clean_extracted_text(text: str) -> str:
     return "\n".join(cleaned_lines).strip()
 
 
-def build_parse_result(file_path: Path, raw_text: str, metadata: dict[str, Any] | None = None) -> ParseResult:
+def build_parse_result(
+    file_path: Path,
+    raw_text: str,
+    clean_text: str,
+    metadata: dict[str, Any] | None = None,
+) -> ParseResult:
     """
         统一构造 ParseResult。
 
-        当 metadata 中包含 "cleaned" 时，会以该值作为 clean_text，并在
-        清洗结果为空时抛出 ParseError。metadata 为空时自动回落为空字典。
+        调用方负责先完成文本清洗；这里仅校验 clean_text 非空并封装结果。
+        metadata 为空时自动回落为空字典。
     """
-    if metadata and "cleaned" in metadata and not metadata["cleaned"].strip():
-        raise ParseError(f"文件 {file_path} 清洗后文本内容为空")
+    if not clean_text.strip():
+        raise ParseError(f"清洗结果为空：{file_path}")
 
     return ParseResult(
         file_name=file_path.name,
         file_path=str(file_path),
         extension=file_path.suffix.lower(),
         raw_text=raw_text,
-        clean_text=metadata.get("cleaned", "") if metadata else "",
+        clean_text=clean_text,
         metadata=metadata or {},
     )
