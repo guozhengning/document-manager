@@ -69,7 +69,7 @@ main.py
             -> resolve_archive_folder()
             -> resolve_suggested_name()
             -> merge_ai_and_rules()
-            -> build_result_record()
+            -> build_result_record_from_context()
             -> save_result()
             -> archive_original_file()
             -> write_processing_log()
@@ -257,6 +257,25 @@ class ArchiveRule:
     doc_type: str
     target_folder: str
 ```
+
+### 5.8 `ResultBuildContext`
+
+```python
+@dataclass(slots=True)
+class ResultBuildContext:
+    job: FileJob
+    stage: str = "pending"
+    parse_result: ParseResult | None = None
+    ai_result: AIResult | None = None
+    result_file: Path | None = None
+    archive_file: Path | None = None
+```
+
+规则：
+
+- 用于单文件处理过程中的统一收口，不直接落盘。
+- `stage` 记录当前处理阶段，如 `parsing`、`analyzing`、`saving_result`、`archiving`。
+- 允许部分字段为空，表示流程尚未执行到对应阶段或该阶段失败。
 
 ## 6. 异常设计
 
@@ -519,21 +538,64 @@ class StorageError(Exception): ...
 
 ### 7.6 结果落盘
 
-#### `build_result_record(job: FileJob, parse_result: ParseResult, ai_result: AIResult, result_file: Path | None = None, archive_file: Path | None = None, status: str = "done", error_message: str | None = None) -> FinalRecord`
+#### `resolve_record_status(error: Exception | None = None, status: str | None = None) -> str`
 
-- 模块路径：`src/storage/results.py`
-- 作用：构建最终结果对象。
-- 输入：任务、解析结果、AI 结果及可选路径。
-- 输出：`FinalRecord`
+- 模块路径：`src/workflow/results.py`
+- 作用：根据显式状态或异常类型推导 `FinalRecord.status`。
+- 输入：异常对象、可选显式状态。
+- 输出：`done` / `failed` / `skipped`
+- 异常：传入非法 `status` 时抛 `ValueError`
+- 调用时机：构建 `FinalRecord` 前
+- 处理规则：
+  - 显式 `status` 优先于异常推导。
+  - `UnsupportedFileError` 映射为 `skipped`。
+  - `ParseError`、`AIError`、`StorageError`、`ConfigError` 和未知异常映射为 `failed`。
+  - 未传 `error` 且未显式指定 `status` 时默认为 `done`。
+
+#### `resolve_error_message(error: Exception | None = None, error_message: str | None = None, stage: str | None = None) -> str | None`
+
+- 模块路径：`src/workflow/results.py`
+- 作用：统一收口错误信息文本。
+- 输入：异常对象、可选显式错误信息、可选阶段名。
+- 输出：错误信息字符串或 `None`
 - 异常：无
+- 调用时机：失败或跳过记录构建时
+- 处理规则：
+  - 显式 `error_message` 优先，其次取 `str(error)`。
+  - 传入 `stage` 时，为错误信息追加形如 `[parsing]` 的阶段前缀。
+  - 失败记录必须最终得到非空错误信息。
+
+#### `build_result_record(job: FileJob, parse_result: ParseResult | None = None, ai_result: AIResult | None = None, result_file: Path | None = None, archive_file: Path | None = None, status: str | None = None, error_message: str | None = None, error: Exception | None = None, stage: str | None = None) -> FinalRecord`
+
+- 模块路径：`src/workflow/results.py`
+- 作用：构建最终结果对象。
+- 输入：任务、解析结果、AI 结果及可选路径、状态、错误信息、异常对象、阶段名。
+- 输出：`FinalRecord`
+- 异常：失败记录缺少错误信息或显式状态非法时抛 `StorageError`
 - 调用时机：处理成功或失败收口阶段
 - 处理规则：
   - 路径字段在落盘前允许为空。
+  - 解析失败或分析失败时允许 `parse_result`、`ai_result` 为空。
+  - 当 `ai_result` 缺失时，`doc_type` 按状态回落为 `处理失败`、`已跳过` 或 `待确认`。
   - 失败记录必须带 `error_message`。
+  - 跳过记录建议保留跳过原因。
+
+#### `build_result_record_from_context(context: ResultBuildContext, error: Exception | None = None, status: str | None = None, error_message: str | None = None) -> FinalRecord`
+
+- 模块路径：`src/workflow/results.py`
+- 作用：基于任务上下文自动构建 `FinalRecord`。
+- 输入：上下文对象、异常对象、可选显式状态、可选显式错误信息。
+- 输出：`FinalRecord`
+- 异常：透传 `build_result_record()` 的参数校验异常
+- 调用时机：单文件处理成功收口或最外层异常收口
+- 处理规则：
+  - 主流程在各阶段持续更新 `context.stage`、`parse_result`、`ai_result`、路径字段。
+  - 成功时可不传 `error`，自动生成 `done` 记录。
+  - 失败时在最外层 `except` 中传入 `error`，自动推导状态并记录阶段信息。
 
 #### `save_result(record: FinalRecord, result_dir: Path, overwrite: bool = False) -> Path`
 
-- 模块路径：`src/storage/results.py`
+- 模块路径：`src/workflow/results.py`
 - 作用：将结果写入 JSON 文件。
 - 输入：`record`、结果目录、是否允许覆盖。
 - 输出：结果文件路径。
@@ -545,7 +607,7 @@ class StorageError(Exception): ...
 
 #### `result_exists(result_path: Path) -> bool`
 
-- 模块路径：`src/storage/results.py`
+- 模块路径：`src/workflow/results.py`
 - 作用：判断结果文件是否已存在。
 - 输入：结果路径
 - 输出：`bool`
@@ -631,31 +693,33 @@ class StorageError(Exception): ...
 - 作用：处理单个文件。
 - 输入：任务、配置、规则。
 - 输出：`FinalRecord`
-- 异常：由调用方决定是否捕获，建议内部抛出后统一收口
+- 异常：建议在最外层捕获后，结合 `ResultBuildContext` 统一收口
 - 调用时机：`run_once()` 内部
 - 处理顺序：
-  1. `parse_document`
-  2. `analyze_document`
-  3. `match_doc_type`
-  4. `resolve_archive_folder`
-  5. `resolve_suggested_name`
-  6. `merge_ai_and_rules`
-  7. `build_result_record`
-  8. `save_result`
-  9. `archive_original_file`
-  10. `write_processing_log`
+  1. 初始化 `ResultBuildContext`
+  2. `parse_document`
+  3. `analyze_document`
+  4. `match_doc_type`
+  5. `resolve_archive_folder`
+  6. `resolve_suggested_name`
+  7. `merge_ai_and_rules`
+  8. `build_result_record_from_context`
+  9. `save_result`
+  10. `archive_original_file`
+  11. `write_processing_log`
 
-#### `handle_processing_error(job: FileJob, error: Exception) -> FinalRecord`
+#### `handle_processing_error(context: ResultBuildContext, error: Exception) -> FinalRecord`
 
 - 模块路径：`src/workflow/runner.py`
-- 作用：将异常转成失败记录。
-- 输入：任务对象、异常。
+- 作用：将异常转成失败或跳过记录。
+- 输入：任务上下文、异常。
 - 输出：失败状态的 `FinalRecord`
 - 异常：无，内部应尽量容错
 - 调用时机：单文件处理异常时
 - 处理规则：
+  - 调用 `build_result_record_from_context()` 统一收口。
   - 记录错误日志。
-  - 尽可能返回可展示的失败结果。
+  - 尽可能返回可展示的失败结果，并保留失败阶段。
 
 ## 8. 核心规则设计
 
@@ -835,7 +899,7 @@ class StorageError(Exception): ...
 7. `src/ai/prompting.py`
 8. `src/ai/analyzer.py`
 9. `src/storage/rules.py`
-10. `src/storage/results.py`
+10. `src/workflow/results.py`
 11. `src/storage/archive.py`
 12. `src/storage/logging_service.py`
 13. `src/workflow/runner.py`
